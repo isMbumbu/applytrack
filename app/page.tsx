@@ -6,6 +6,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const STATUSES = ["Interested", "Preparing application", "Applied", "Assessment", "Interview", "Offer", "Rejected", "Withdrawn"] as const;
 type Status = typeof STATUSES[number];
 type Application = { id: string; company: string; role: string; link: string | null; location: string | null; status: Status; applied: string | null; followup: string | null; salary: string | null; contact: string | null; notes: string | null; created_at: string };
+type GmailSuggestion = { id: string; subject: string; role: string; company: string; date: string };
 type Draft = Omit<Application, "id" | "created_at">;
 const emptyDraft: Draft = { company: "", role: "", link: "", location: "", status: "Interested", applied: new Date().toISOString().slice(0,10), followup: "", salary: "", contact: "", notes: "" };
 const formatDate = (date: string | null) => date ? new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
@@ -17,6 +18,9 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All statuses");
   const [dialog, setDialog] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailSuggestions, setGmailSuggestions] = useState<GmailSuggestion[]>([]);
+  const [gmailMessage, setGmailMessage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const refresh = useCallback(async () => {
@@ -25,6 +29,12 @@ export default function Home() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gmail") === "connected") setGmailMessage("Gmail connected. Review sent application emails to add them.");
+    if (params.get("gmail") === "error") setGmailMessage("Gmail connection was cancelled or could not be completed.");
+    void fetch(`${API}/integrations/gmail/status`).then(r => r.ok ? r.json() : null).then(data => { if (data) setGmailConnected(Boolean(data.connected)); }).catch(() => undefined);
+  }, []);
 
   const counts = useMemo(() => ({
     total: applications.length,
@@ -42,6 +52,9 @@ export default function Home() {
     catch { setError("Couldn’t save your application. Check that the API is running and try again."); }
   };
   const remove = async () => { if (!editing || !window.confirm("Delete this application?")) return; const response = await fetch(`${API}/applications/${editing}`, { method: "DELETE" }); if (response.ok) { setDialog(false); await refresh(); } else setError("Couldn’t delete this application."); };
+  const connectGmail = async () => { setGmailMessage(""); try { const response = await fetch(`${API}/integrations/gmail/connect`); const data = await response.json(); if (!response.ok) throw new Error(data.detail || "Could not start Gmail connection."); window.location.assign(data.authorization_url); } catch (cause) { setGmailMessage(cause instanceof Error ? cause.message : "Could not connect Gmail."); } };
+  const findSentApplications = async () => { setGmailMessage("Searching recent sent mail…"); try { const response = await fetch(`${API}/integrations/gmail/suggestions`); const data = await response.json(); if (!response.ok) throw new Error(data.detail || "Could not search Gmail."); setGmailSuggestions(data); setGmailMessage(data.length ? "Choose an email to prefill the application form." : "No likely application emails found in the last 180 days."); } catch (cause) { setGmailMessage(cause instanceof Error ? cause.message : "Could not search Gmail."); } };
+  const disconnectGmail = async () => { const response = await fetch(`${API}/integrations/gmail`, { method: "DELETE" }); if (response.ok) { setGmailConnected(false); setGmailSuggestions([]); setGmailMessage("Gmail disconnected."); } };
   const exportCsv = () => { const columns: (keyof Application)[] = ["company", "role", "link", "location", "status", "applied", "followup", "salary", "contact", "notes"]; const lines = [columns.join(","), ...applications.map(row => columns.map(key => `"${String(row[key] || "").replaceAll('"', '""')}"`).join(","))]; const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "applytrack-applications.csv"; anchor.click(); URL.revokeObjectURL(url); };
   const now = new Date(); const months = Array.from({ length: 6 }, (_, i) => new Date(now.getFullYear(), now.getMonth() - 5 + i, 1));
 
@@ -59,7 +72,7 @@ export default function Home() {
         </div></section>
       <section className="reminder" id="followups"><span>◷</span><div><b>Stay on top of follow-ups</b><small>Follow-up dates appear here when added to an application.</small></div><button onClick={()=>{const upcoming=applications.filter(a=>a.followup && a.followup>=new Date().toISOString().slice(0,10)).sort((a,b)=>(a.followup||"").localeCompare(b.followup||""))[0];if(upcoming)openEdit(upcoming);else openNew();}}>{counts.followups ? `${counts.followups} upcoming →` : "Add a follow-up →"}</button></section><footer>Made for the next opportunity. <b>ApplyTrack</b></footer>
     </div></main>
-    {dialog && <div className="overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setDialog(false);}}><form className="dialog" onSubmit={save}><div className="dialog-head"><div><div className="eyebrow">APPLICATION DETAILS</div><h2>{editing ? "Edit application" : "Add an application"}</h2></div><button type="button" className="close" onClick={()=>setDialog(false)}>×</button></div><div className="form-grid">
+    {dialog && <div className="overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setDialog(false);}}><form className="dialog" onSubmit={save}><div className="dialog-head"><div><div className="eyebrow">APPLICATION DETAILS</div><h2>{editing ? "Edit application" : "Add an application"}</h2></div><button type="button" className="close" onClick={()=>setDialog(false)}>×</button></div><section className="gmail-import"><div><b>Import from Gmail</b><small>Find application emails in your Sent folder. Read-only access.</small></div><div className="gmail-actions">{gmailConnected ? <><button type="button" className="secondary" onClick={()=>void findSentApplications()}>Find sent applications</button><button type="button" className="gmail-disconnect" onClick={()=>void disconnectGmail()}>Disconnect</button></> : <button type="button" className="secondary" onClick={()=>void connectGmail()}>Connect Gmail</button>}</div>{gmailMessage && <p className="gmail-message" role="status">{gmailMessage}</p>}{gmailSuggestions.length>0 && <ul className="gmail-suggestions">{gmailSuggestions.map(s=><li key={s.id}><span><b>{s.subject}</b><small>{s.date}</small></span><button type="button" className="use-email" onClick={()=>{setDraft({...draft,company:s.company,role:s.role,applied:s.date ? new Date(s.date).toISOString().slice(0,10) : draft.applied,status:"Applied"});setGmailMessage("Email details added. Review and save the application below.");}}>Use email</button></li>)}</ul>}</section><div className="form-grid">
       <label>Company name *<input required maxLength={160} value={draft.company} onChange={e=>setDraft({...draft,company:e.target.value})} placeholder="e.g. Acme Studio" /></label><label>Job title *<input required maxLength={160} value={draft.role} onChange={e=>setDraft({...draft,role:e.target.value})} placeholder="e.g. Product Designer" /></label><label>Job link<input type="url" value={draft.link||""} onChange={e=>setDraft({...draft,link:e.target.value})} placeholder="https://" /></label><label>Location<input value={draft.location||""} onChange={e=>setDraft({...draft,location:e.target.value})} placeholder="e.g. Nairobi, Kenya" /></label><label>Status<select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as Status})}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></label><label>Application date<input type="date" value={draft.applied||""} onChange={e=>setDraft({...draft,applied:e.target.value})} /></label><label>Salary range<input value={draft.salary||""} onChange={e=>setDraft({...draft,salary:e.target.value})} placeholder="e.g. $70k–$90k" /></label><label>Next follow-up<input type="date" value={draft.followup||""} onChange={e=>setDraft({...draft,followup:e.target.value})} /></label><label className="wide">Contact details<input value={draft.contact||""} onChange={e=>setDraft({...draft,contact:e.target.value})} placeholder="Name, email or phone" /></label><label className="wide">Notes<textarea rows={3} value={draft.notes||""} onChange={e=>setDraft({...draft,notes:e.target.value})} placeholder="Interview details, role notes, next steps…" /></label></div><div className="dialog-footer">{editing && <button type="button" className="delete" onClick={()=>void remove()}>Delete application</button>}<span/><button type="button" className="secondary" onClick={()=>setDialog(false)}>Cancel</button><button type="submit" className="primary">Save application</button></div></form></div>}
   </div>;
 }
