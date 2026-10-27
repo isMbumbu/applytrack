@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f7f3" />
+    <title>ApplyTrack — Your job search, in focus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="ApplyTrack home"><span class="brand-mark">A</span><span>applytrack</span></a>
+        <div class="workspace-label">WORKSPACE</div>
+        <nav aria-label="Main navigation"><a class="nav-item active" href="#dashboard"><span class="nav-icon">◫</span>Overview</a><a class="nav-item" href="#applications"><span class="nav-icon">▤</span>Applications <span class="nav-count" id="nav-total">0</span></a><a class="nav-item" href="#reminders"><span class="nav-icon">◷</span>Follow-ups</a></nav>
+        <div class="sidebar-bottom"><div class="tip-card"><span class="tip-spark">✳</span><strong>One step at a time.</strong><p>Every application brings you closer to the right opportunity.</p></div><button class="profile"><span class="avatar">A</span><span><strong>My workspace</strong><small>Personal account</small></span><span class="more">···</span></button></div>
+      </aside>
+      <main class="main-content">
+        <header class="topbar"><div class="breadcrumbs">Workspace <span>/</span> <strong>Overview</strong></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♧</button><span class="avatar small">A</span></div></header>
+        <section class="page" id="dashboard">
+          <div class="welcome-row"><div><div class="eyebrow" id="today-label">YOUR JOB SEARCH</div><h1>Good morning, Andrew <span class="wave">✳</span></h1><p class="subheading">A clear view of your progress and what’s next.</p></div><button class="primary-button" id="add-application"><span>＋</span> Add application</button></div>
+          <div class="stats-grid" id="stats"></div>
+          <section class="content-grid">
+            <div class="panel activity-panel"><div class="panel-heading"><div><h2>Application activity</h2><p>Applications over the last 6 months</p></div><span class="pill subtle">This year</span></div><div class="chart-wrap"><div class="chart-y"><span>8</span><span>6</span><span>4</span><span>2</span><span>0</span></div><div class="chart" id="activity-chart"></div></div></div>
+            <div class="panel funnel-panel"><div class="panel-heading"><div><h2>Search snapshot</h2><p>How your applications are moving</p></div></div><div id="snapshot"></div><a class="text-link" href="#applications">View applications <span>→</span></a></div>
+          </section>
+          <section class="panel applications-panel" id="applications"><div class="panel-heading table-heading"><div><h2>Recent applications</h2><p>Keep your search organized and moving forward.</p></div><div class="table-actions"><label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Search applications" /></label><select id="status-filter" aria-label="Filter by status"><option value="all">All statuses</option></select><button class="export-button" id="export">Export</button></div></div><div class="table-scroll"><table><thead><tr><th>COMPANY / ROLE</th><th>STATUS</th><th>APPLIED</th><th>NEXT FOLLOW-UP</th><th></th></tr></thead><tbody id="application-rows"></tbody></table></div><div class="empty-state" id="empty-state" hidden><span>✳</span><h3>Your next chapter starts here</h3><p>Add an application to keep your job search organized.</p><button class="primary-button" id="empty-add">＋ Add your first application</button></div></section>
+          <section id="reminders" class="reminder-note"><span class="reminder-icon">◷</span><span><strong>Stay on top of follow-ups</strong><small>Follow-up dates appear here when added to an application.</small></span><button id="reminder-count" class="text-link">See upcoming →</button></section>
+          <footer>Made for the next opportunity. <span>ApplyTrack</span></footer>
+        </section>
+      </main>
+    </div>
+    <dialog id="application-dialog"><form method="dialog" id="application-form"><div class="modal-heading"><div><div class="eyebrow">APPLICATION DETAILS</div><h2 id="modal-title">Add an application</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div><input type="hidden" id="application-id" /><div class="form-grid"><label>Company name *<input id="company" required placeholder="e.g. Acme Studio" /></label><label>Job title *<input id="role" required placeholder="e.g. Product Designer" /></label><label>Job link<input id="link" type="url" placeholder="https://" /></label><label>Location<input id="location" placeholder="e.g. Nairobi, Kenya" /></label><label>Status<select id="status"></select></label><label>Application date<input id="applied" type="date" /></label><label>Salary range<input id="salary" placeholder="e.g. $70k–$90k" /></label><label>Next follow-up<input id="followup" type="date" /></label><label class="full">Contact details<input id="contact" placeholder="Name, email or phone" /></label><label class="full">Notes<textarea id="notes" rows="3" placeholder="Interview details, role notes, next steps…"></textarea></label></div><div class="modal-footer"><button type="button" class="danger-link" id="delete-application" hidden>Delete application</button><span></span><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" type="submit">Save application</button></div></form></dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
