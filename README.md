@@ -1,35 +1,45 @@
 # ApplyTrack
 
-ApplyTrack is a personal job application tracker. This first MVP gives you one place to record applications, see your search at a glance, and keep follow-ups in view.
+ApplyTrack is a job application tracker built with **Next.js, React, TypeScript, and FastAPI**. The MVP includes an application dashboard, searchable status tracking, follow-up dates, and CSV export.
 
-## Start the app
-
-This version is a static web app with no build step or dependencies. From this directory, run:
+## Run with Docker Compose
 
 ```sh
-python3 -m http.server 8000
+docker compose up --build
 ```
 
-Then open [http://localhost:8000](http://localhost:8000).
+Open [http://localhost:3000](http://localhost:3000). The API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). Application records are stored in a persistent SQLite volume.
 
-## MVP features
+## Run locally
 
-- Dashboard totals for applications, pending responses, interviews, offers, and upcoming follow-ups
-- Create, edit, and delete applications with role, company, link, location, status, dates, salary, contact, and notes
-- Search and filter applications by status
-- Application activity chart and a compact search snapshot
+Start the API:
+
+```sh
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+In another terminal, start the frontend:
+
+```sh
+npm install
+npm run dev
+```
+
+The frontend reads `NEXT_PUBLIC_API_URL`, defaulting to `http://localhost:8000`. The API stores data in `backend/app/applytrack.db` by default; set `APPLYTRACK_DB_PATH` to change it. Configure comma-separated browser origins with `CORS_ORIGINS`.
+
+## Included
+
+- Create, update, and delete job applications
+- Track company, title, job link, location, salary, contact, notes, status, application date, and follow-up date
+- Search and filter by status
+- Dashboard totals, activity chart, and application snapshot
 - Export application records to CSV
-- Browser-local persistence using `localStorage`
+- FastAPI validation, SQLite persistence, health endpoint, and interactive API docs
 
-The dashboard opens with a few sample records so it is useful immediately. The first saved change replaces those examples with your own records.
+## MVP boundaries
 
-## Current limits
-
-This is a personal-use frontend prototype. Data stays in the current browser and is not synced, backed up, or protected by accounts. Email reminders, optional CC recipients, authentication, a server API, and PostgreSQL are not implemented yet. Do not enter sensitive information you need to keep private or backed up.
-
-## Next steps
-
-1. Add a FastAPI backend and PostgreSQL schema with per-user ownership.
-2. Add authentication and move browser records into the account-backed API.
-3. Add scheduled reminders and notification settings, including explicit opt-in CC recipients.
-4. Add document/version tracking and richer analytics.
+This initial version has no user accounts or per-user access control. The API is intended for local development and a single personal workspace; do not expose it publicly with private application data until authentication and authorization are added. Email reminders and optional CC notification recipients are planned but not implemented. The database is SQLite for a simple local MVP; the schema can move to PostgreSQL as the service grows.

@@ -1,0 +1,23 @@
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      APPLYTRACK_DB_PATH: /data/applytrack.db
+      CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - applytrack-data:/data
+
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  applytrack-data:

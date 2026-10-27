@@ -1,0 +1,65 @@
+"use client";
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const STATUSES = ["Interested", "Preparing application", "Applied", "Assessment", "Interview", "Offer", "Rejected", "Withdrawn"] as const;
+type Status = typeof STATUSES[number];
+type Application = { id: string; company: string; role: string; link: string | null; location: string | null; status: Status; applied: string | null; followup: string | null; salary: string | null; contact: string | null; notes: string | null; created_at: string };
+type Draft = Omit<Application, "id" | "created_at">;
+const emptyDraft: Draft = { company: "", role: "", link: "", location: "", status: "Interested", applied: new Date().toISOString().slice(0,10), followup: "", salary: "", contact: "", notes: "" };
+const formatDate = (date: string | null) => date ? new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+
+export default function Home() {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All statuses");
+  const [dialog, setDialog] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const refresh = useCallback(async () => {
+    try { const response = await fetch(`${API}/applications`, { cache: "no-store" }); if (!response.ok) throw new Error("Could not load applications"); setApplications(await response.json()); setError(""); }
+    catch { setError("Can’t reach the ApplyTrack API. Start the FastAPI server and try again."); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const counts = useMemo(() => ({
+    total: applications.length,
+    pending: applications.filter(a => a.status === "Applied" || a.status === "Assessment").length,
+    interviews: applications.filter(a => a.status === "Interview").length,
+    offers: applications.filter(a => a.status === "Offer").length,
+    followups: applications.filter(a => a.followup && a.followup >= new Date().toISOString().slice(0,10)).length,
+  }), [applications]);
+  const visible = applications.filter(a => (filter === "All statuses" || a.status === filter) && `${a.company} ${a.role} ${a.location || ""}`.toLowerCase().includes(query.toLowerCase()));
+  const openNew = () => { setEditing(null); setDraft({ ...emptyDraft, applied: new Date().toISOString().slice(0,10) }); setDialog(true); };
+  const openEdit = (application: Application) => { setEditing(application.id); setDraft({ company: application.company, role: application.role, link: application.link || "", location: application.location || "", status: application.status, applied: application.applied || "", followup: application.followup || "", salary: application.salary || "", contact: application.contact || "", notes: application.notes || "" }); setDialog(true); };
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError("");
+    try { const response = await fetch(`${API}/applications${editing ? `/${editing}` : ""}`, { method: editing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...draft, link: draft.link || null, location: draft.location || null, applied: draft.applied || null, followup: draft.followup || null, salary: draft.salary || null, contact: draft.contact || null, notes: draft.notes || null }) }); if (!response.ok) throw new Error("Could not save application"); setDialog(false); await refresh(); }
+    catch { setError("Couldn’t save your application. Check that the API is running and try again."); }
+  };
+  const remove = async () => { if (!editing || !window.confirm("Delete this application?")) return; const response = await fetch(`${API}/applications/${editing}`, { method: "DELETE" }); if (response.ok) { setDialog(false); await refresh(); } else setError("Couldn’t delete this application."); };
+  const exportCsv = () => { const columns: (keyof Application)[] = ["company", "role", "link", "location", "status", "applied", "followup", "salary", "contact", "notes"]; const lines = [columns.join(","), ...applications.map(row => columns.map(key => `"${String(row[key] || "").replaceAll('"', '""')}"`).join(","))]; const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "applytrack-applications.csv"; anchor.click(); URL.revokeObjectURL(url); };
+  const now = new Date(); const months = Array.from({ length: 6 }, (_, i) => new Date(now.getFullYear(), now.getMonth() - 5 + i, 1));
+
+  return <div className="shell">
+    <aside className="sidebar"><a className="brand" href="#"><span className="brand-icon">A</span>applytrack</a><div className="side-label">WORKSPACE</div><nav><a className="nav active" href="#overview"><span>◫</span> Overview</a><a className="nav" href="#applications"><span>▤</span> Applications <b>{counts.total}</b></a><a className="nav" href="#followups"><span>◷</span> Follow-ups</a></nav><div className="side-bottom"><div className="tip"><span>✳</span><strong>One step at a time.</strong><p>Every application brings you closer to the right opportunity.</p></div><div className="account"><span className="avatar">A</span><div><strong>My workspace</strong><small>Personal account</small></div></div></div></aside>
+    <main className="main"><header className="topbar"><span>Workspace <i>/</i> <b>Overview</b></span><span className="avatar mini">A</span></header><div className="content" id="overview">
+      <div className="welcome"><div><div className="eyebrow">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()}</div><h1>Good morning, Andrew <span>✳</span></h1><p>A clear view of your progress and what’s next.</p></div><button className="primary" onClick={openNew}>＋ Add application</button></div>
+      {error && <div className="error" role="alert">{error}</div>}
+      <section className="stats">{[["Total applications",counts.total,"▤","All roles you’re tracking"],["Pending response",counts.pending,"◷","Waiting to hear back"],["Interviews",counts.interviews,"↗","You’re making progress"],["Offers",counts.offers,"✳","The exciting part"],["Upcoming follow-ups",counts.followups,"◴","Keep the momentum"]].map(([label,value,icon,foot])=><article className="stat" key={String(label)}><div>{label}<span>{icon}</span></div><strong>{loading ? "—" : value}</strong><small>{foot}</small></article>)}</section>
+      <section className="insights"><article className="panel activity"><div className="panel-head"><div><h2>Application activity</h2><p>Applications over the last 6 months</p></div><span className="chip">This year</span></div><div className="chart"><div className="axis"><span>8</span><span>6</span><span>4</span><span>2</span><span>0</span></div><div className="bars">{months.map(month=>{const n=applications.filter(a=>a.applied?.slice(0,7)===month.toISOString().slice(0,7)).length;return <div className="month" key={month.toISOString()}><div className="bar-pair"><i style={{height:`${Math.max(3,n/8*100)}%`}}/><i style={{height:`${Math.max(3,n/10*70)}%`}}/></div><small>{month.toLocaleDateString("en-US",{month:"short"})}</small></div>;})}</div></div></article>
+        <article className="panel snapshot"><div className="panel-head"><div><h2>Search snapshot</h2><p>How your applications are moving</p></div></div>{[["Applications",counts.total],["Interviews",counts.interviews],["Offers",counts.offers]].map(([label,n])=><div className="progress-row" key={String(label)}><span>{label}</span><div><i style={{width:`${Math.max(4,Number(n)/Math.max(1,counts.total)*100)}%`}}/></div><b>{n}</b></div>)}<a className="text-link" href="#applications">View applications →</a></article></section>
+      <section className="panel applications" id="applications"><div className="list-head"><div><h2>Recent applications</h2><p>Keep your search organized and moving forward.</p></div><div className="controls"><label className="search">⌕ <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search applications" /></label><select value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filter applications"><option>All statuses</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select><button className="export" onClick={exportCsv}>Export</button></div></div>
+        <div className="table-scroll"><table><thead><tr><th>COMPANY / ROLE</th><th>STATUS</th><th>APPLIED</th><th>NEXT FOLLOW-UP</th><th/></tr></thead><tbody>{visible.map(a=><tr key={a.id}><td><div className="company"><span>{a.company.slice(0,1).toUpperCase()}</span><div><b>{a.company}</b><small>{a.role}{a.location ? ` · ${a.location}` : ""}</small></div></div></td><td><span className={`badge ${a.status.toLowerCase().replaceAll(" ","-")}`}>{a.status}</span></td><td>{formatDate(a.applied)}</td><td>{formatDate(a.followup)}</td><td><button className="edit" onClick={()=>openEdit(a)} aria-label={`Edit ${a.company}`}>···</button></td></tr>)}</tbody></table>
+          {!loading && visible.length===0 && <div className="empty"><span>✳</span><h3>{applications.length ? "No applications match" : "Your next chapter starts here"}</h3><p>{applications.length ? "Try another search or status filter." : "Add an application to keep your job search organized."}</p>{applications.length===0 && <button className="primary" onClick={openNew}>＋ Add your first application</button>}</div>}
+        </div></section>
+      <section className="reminder" id="followups"><span>◷</span><div><b>Stay on top of follow-ups</b><small>Follow-up dates appear here when added to an application.</small></div><button onClick={()=>{const upcoming=applications.filter(a=>a.followup && a.followup>=new Date().toISOString().slice(0,10)).sort((a,b)=>(a.followup||"").localeCompare(b.followup||""))[0];if(upcoming)openEdit(upcoming);else openNew();}}>{counts.followups ? `${counts.followups} upcoming →` : "Add a follow-up →"}</button></section><footer>Made for the next opportunity. <b>ApplyTrack</b></footer>
+    </div></main>
+    {dialog && <div className="overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setDialog(false);}}><form className="dialog" onSubmit={save}><div className="dialog-head"><div><div className="eyebrow">APPLICATION DETAILS</div><h2>{editing ? "Edit application" : "Add an application"}</h2></div><button type="button" className="close" onClick={()=>setDialog(false)}>×</button></div><div className="form-grid">
+      <label>Company name *<input required maxLength={160} value={draft.company} onChange={e=>setDraft({...draft,company:e.target.value})} placeholder="e.g. Acme Studio" /></label><label>Job title *<input required maxLength={160} value={draft.role} onChange={e=>setDraft({...draft,role:e.target.value})} placeholder="e.g. Product Designer" /></label><label>Job link<input type="url" value={draft.link||""} onChange={e=>setDraft({...draft,link:e.target.value})} placeholder="https://" /></label><label>Location<input value={draft.location||""} onChange={e=>setDraft({...draft,location:e.target.value})} placeholder="e.g. Nairobi, Kenya" /></label><label>Status<select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as Status})}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></label><label>Application date<input type="date" value={draft.applied||""} onChange={e=>setDraft({...draft,applied:e.target.value})} /></label><label>Salary range<input value={draft.salary||""} onChange={e=>setDraft({...draft,salary:e.target.value})} placeholder="e.g. $70k–$90k" /></label><label>Next follow-up<input type="date" value={draft.followup||""} onChange={e=>setDraft({...draft,followup:e.target.value})} /></label><label className="wide">Contact details<input value={draft.contact||""} onChange={e=>setDraft({...draft,contact:e.target.value})} placeholder="Name, email or phone" /></label><label className="wide">Notes<textarea rows={3} value={draft.notes||""} onChange={e=>setDraft({...draft,notes:e.target.value})} placeholder="Interview details, role notes, next steps…" /></label></div><div className="dialog-footer">{editing && <button type="button" className="delete" onClick={()=>void remove()}>Delete application</button>}<span/><button type="button" className="secondary" onClick={()=>setDialog(false)}>Cancel</button><button type="submit" className="primary">Save application</button></div></form></div>}
+  </div>;
+}
