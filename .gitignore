@@ -4,3 +4,10 @@
 !.env.example
 node_modules/
 dist/
+.next/
+out/
+*.db
+__pycache__/
+.venv/
+venv/
+*.py[cod]
