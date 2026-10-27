@@ -6,6 +6,10 @@ services:
     environment:
       APPLYTRACK_DB_PATH: /data/applytrack.db
       CORS_ORIGINS: http://localhost:3000
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI:-http://localhost:8000/integrations/gmail/callback}
+      FRONTEND_URL: http://localhost:3000
     volumes:
       - applytrack-data:/data
 
